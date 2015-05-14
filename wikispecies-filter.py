@@ -7,6 +7,8 @@ import md5
 from datetime import *
 from uuid import *
 
+DEBUG_LOG = False
+
 dagger = u'\u2020'
 dascii = dagger.encode('utf-8')
 
@@ -42,7 +44,6 @@ def cleanup(x):
         x = x[0].upper() + x[1:]
     dag = ''
     if extinct:
-        #print dascii + x
         dag = dascii
     return dag + x
 
@@ -61,9 +62,6 @@ nows = now.strftime("%Y-%m-%dT%H:%M:%S.%f")
 def makeid(a, b):
     b = b.replace(dascii, '')
     return uuid5(a, b)
-
-#"nm":"Wikispecies: Tree of Life",
-#"hi":str(makeid(bid, "Homo sapiens")),
 
 metaD = { "BrainId":str(bid) }
 open('ws/meta.json', 'wt').write( json.dumps(metaD) )
@@ -97,14 +95,12 @@ ids = set()
 
 i = 0
 
-
-
 def makeThought(tname, label):
     global i
     tid = makeid(bid, tname)
 
     if tname == '':
-        #print 'Missing name for '+page
+        print 'Missing name for '+page
         return # don't write out empty thought names (and redundant IDs!)
 
     stid = str(tid)
@@ -123,7 +119,7 @@ def makeThought(tname, label):
     "ACType":0,
     "Kind":1,
     "ThoughtIconInfo":"1:" }
-    tfile.write(  json.dumps(d) + '\n' )       #`d`.replace("'", '"') + '\n')
+    tfile.write(  json.dumps(d) + '\n' )
 
     if i % 1000 == 0:
         #print d
@@ -134,8 +130,7 @@ def makeThought(tname, label):
 def makeLink(me, child):
     if me == child:
         return
-    #print '"'+me +'" -> "'+child+'"'
-
+    
     makeThought(child, '')
     makeThought(me, '')
 
@@ -148,7 +143,6 @@ def makeLink(me, child):
         return
 
     ids.add(slid)
-
 
     d = {
     "Id":str(lid),
@@ -170,7 +164,7 @@ def makeLink(me, child):
 def makeUrlAttachment(tid, name, url):
     d = {
     "BrainId":str(bid),
-    "Id":str(uuid4()),  #str(makeid(bid, url)),
+    "Id":str(uuid4()),
     "SourceId":str(tid),
     "Name":name,
     "Location":url,
@@ -182,53 +176,52 @@ def makeUrlAttachment(tid, name, url):
     "IsIcon":False,
     "SourceType":2 }
     
-    #print json.dumps(d)
     afile.write(  json.dumps(d) + '\n' )
 
 page = ''
-taxo = ''
 vn = ''
-taxo2 = ''
+title = ''
 #blanklines = 0
 for line in fileinput.input():
     origline = line
     line = line.lower().strip()
     #line = line.decode("utf-8")
-    if line == '':
-        if taxo != '':
-            taxo = ''
-        #blanklines += 1
-        #if blanklines == 2:
-        #  taxo = ''
-        #  blanklines = 0
-    #else:
-    #   blanklines = 0
+    
+    # do we want this?
+    #if line == '':
+    #    if page != '':
+    #        page = ''
     if line.find('<title>') > -1:
         ps = line.replace('</title>','').split('<title>')
         page = ps[1]
         if page.find(':') > -1:
             page = ''
+            continue
         page = cleanup(page)
-        taxo = ''
-        taxo2 = ''
+        taxo = page
+        title = page
         vn = ''
+        if DEBUG_LOG: print page + ' <THOUGHT>'
+        makeThought(page, "")
         #print 'page is', page
-    if line.find('taxonavigation') > -1:
+        '''elif line.find('taxonavigation') > -1:
         #print 'taxonavigation for', page
         taxo = page
-        makeThought(taxo, "")
+        
         #print '---------'
-        #print 'PAGE', page
+        #print 'PAGE', page'''
     elif line.find('__toc__') > -1:
         #if taxo != '':
+        page = ''
         taxo = ''
-    elif line.startswith('=='):
+    elif line.find('taxonavigation') < 0 and line.startswith('=='):
+        page = ''
         taxo = ''
     elif line.startswith('{{vn'):
         vn = 'vn'
-    elif line.find('|en=') > -1:
+    elif vn != '' and line.find('|en=') > -1:
         label = ''
-        pieces = line.split('|en=')
+        pieces = origline.split('|en=')
         if len(pieces) >= 2:
             line = pieces[1]
             if line.find('|') > -1:
@@ -237,13 +230,9 @@ for line in fileinput.input():
                 line = line[:line.index('}}')]
             label = line.strip()
             if label != '':
-                #print page + " LABEL " + label
-                makeThought(page, label)
+                if DEBUG_LOG: print title + " --LABEL--> " + label
+                makeThought(title, label)
     else:
-        #http://upload.wikimedia.org/wikipedia/commons/f/fe/Onycophora_%28515525252%29.jpg
-        #http://upload.wikimedia.org/wikipedia/commons/e/e0/Onycophora_%28515525252%29.jpg
-        # http://species.wikimedia.org/wiki/File:Eukaryota_diversity_2.jpg
-        # --> http://upload.wikimedia.org/wikipedia/commons/7/7d/Eukaryota_diversity_2.jpg
         ims = imre1.findall(origline) + imre2.findall(origline) + imre3.findall(origline) + imre4.findall(origline)
         if len(ims) > 0 and page != '':
             for imurl in ims:
@@ -255,23 +244,26 @@ for line in fileinput.input():
                 imurl = 'http://upload.wikimedia.org/wikipedia/commons/' + hsh[0] + '/' + hsh[0:2] + '/' + imurl
                 tid = makeid(bid, page)
                 makeUrlAttachment(tid, imname, imurl)
-                #print page + " --IMAGE--> " + imurl
-        elif taxo == page and taxo != '' and page != '':
+                if DEBUG_LOG: print page + " --IMAGE--> " + imurl
+        elif page != '': #taxo == page and taxo != '' and page != '':
             ret = re1.findall(line) + re2.findall(line) + re3.findall(line) + re4.findall(line)
             for x in ret:
                 x = cleanup(x)
                 if x == '':
                     continue
-                if taxo == x or x.find(':') > -1:
-                    taxo2 = taxo
+                
+                if x.find(':') > -1:
                     continue
-                if taxo2 == '':
-                    #print "skipped " + pretty(taxo, x)
-                    continue  # skip items above the entry for self
-                #prett = pretty(taxo, x)
-                #if prett != '':
-                #    print prett
-                makeLink(taxo, x)
+                
+                # eat every line until we find {{PAGENAME}}, then the stuff below are the children!
+                if taxo != '':
+                    if x == taxo:
+                        taxo = ''
+                    continue
+                
+                # ok we ate the {{PAGENAME}} line, make everything after that into a child link!
+                if DEBUG_LOG: print page + " --LINK CHILD--> " + x
+                makeLink(page, x)
 
 tfile.close()
 lfile.close()
