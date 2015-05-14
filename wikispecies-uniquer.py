@@ -23,6 +23,14 @@ def maybedagger(id, line, daggers):
         return line
     return line.replace(replacer, replacer+r'\u2020')
 
+count = 0
+def progress():
+    global count
+    if count % 1000 == 0:
+        sys.stdout.write('.')
+        sys.stdout.flush()
+    count += 1
+
 for line in open(fn,'rt').readlines():
     line = line.replace('\n','')
     d = eval(line)
@@ -31,6 +39,7 @@ for line in open(fn,'rt').readlines():
     if not id in seen and lb != '':
         f.write(maybedagger(id, line, daggers) + '\n')
         seen.add(id)
+        progress()
 
 for line in open(fn,'rt').readlines():
     line = line.replace('\n','')
@@ -40,8 +49,6 @@ for line in open(fn,'rt').readlines():
         continue
     f.write(maybedagger(id, line, daggers) + '\n')
     seen.add(id)
+    progress()
 
 f.close()
-
-#print labels
-

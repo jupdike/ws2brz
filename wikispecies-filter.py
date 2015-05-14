@@ -1,3 +1,4 @@
+import sys
 import urllib
 import fileinput
 import re
@@ -53,13 +54,9 @@ def pretty(me, child):
     return '"'+me +'" -> "'+child+'"'
 
 
-
-#"901f55e4-f213-4f42-a5f5-5e5a31a49c0e"
 bid = UUID(int=0x12345678123456781234567812345678)
 now = datetime.now()
 nows = now.strftime("%Y-%m-%dT%H:%M:%S.%f")
-#print nows
-
 
 def makeid(a, b):
     b = b.replace(dascii, '')
@@ -114,7 +111,9 @@ def makeThought(tname, label):
     tfile.write(  json.dumps(d) + '\n' )       #`d`.replace("'", '"') + '\n')
 
     if i % 1000 == 0:
-        print d
+        #print d
+        sys.stdout.write('.')
+        sys.stdout.flush()
     i += 1
 
 def makeLink(me, child):
@@ -255,8 +254,6 @@ for line in fileinput.input():
 tfile.close()
 lfile.close()
 afile.close()
-
-# 'andreaea moss}}</text>', 'nm': u'Andreaea sinuosa'
 
 '''
 time   bzcat specieswiki-20150426-pages-articles.xml.bz2 | head -n 1000000 | python filter.py | wc -l
