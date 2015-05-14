@@ -62,21 +62,34 @@ def makeid(a, b):
     b = b.replace(dascii, '')
     return uuid5(a, b)
 
-brainD = {
-"id":str(bid),
-"nm":"Wikispecies: Tree of Life",
-"hi":str(makeid(bid, "Homo sapiens")),
-"es":0,"pr":0,
-"cdt":nows,
-"mdt":nows,
-"ThumbnailDate":nows}
+#"nm":"Wikispecies: Tree of Life",
+#"hi":str(makeid(bid, "Homo sapiens")),
 
-open('ws/brain.json', 'wt').write(`brainD`.replace("'", '"'))
-
+metaD = { "BrainId":str(bid) }
+open('ws/meta.json', 'wt').write( json.dumps(metaD) )
 
 afile = open('ws/attachments.json', 'wt')
 open('ws/tombstones.json', 'wt').write('')
-open('ws/settings.json', 'wt').write('')
+
+# in Enums.cs, BrainSettingKey.BrainName = 19, make enum->int->string, similar for HomeThoughtId
+BrainName = "19"
+HomeThoughtId = "20"
+homeThought = makeid(bid, "Mammalia") # near top of xml dump so works for testing even using small chunk of data
+settings = [(BrainName, "Wikispecies: Tree of Life"), (HomeThoughtId, str(homeThought))]
+def settingD(a,b):
+    return {
+    "Id": str(makeid(bid, a)),
+    "BrainId":str(bid),
+    "Value": b,
+    "CreationDateTime":nows,
+    "ModificationDateTime":nows
+    }
+sfile = open('ws/settings.json', 'wt')
+for pair in settings:
+    a,b = pair
+    sfile.write( json.dumps( settingD(a,b) ) + '\n')
+sfile.close()
+
 tfile = open('ws/thoughts.json', 'wt')
 lfile = open('ws/links.json', 'wt')
 
@@ -101,13 +114,15 @@ def makeThought(tname, label):
     ids.add(stid)
 
     d = {
-    "bg":str(bid),
-    "id":stid,
-    "nm":   tname.decode("utf-8"),
-    "cdt":nows,
-    "rdt":nows,
-    "lb":label,
-    "at":0,"it":0,"fc":-1,"bc":-1,"tii":"2:"}
+    "BrainId":str(bid),
+    "Id":stid,
+    "Name":   tname.decode("utf-8"),
+    "CreationDateTime":nows,
+    "ModificationDateTime":nows,
+    "Label":label,
+    "ACType":0,
+    "Kind":1,
+    "ThoughtIconInfo":"1:" }
     tfile.write(  json.dumps(d) + '\n' )       #`d`.replace("'", '"') + '\n')
 
     if i % 1000 == 0:
@@ -136,29 +151,36 @@ def makeLink(me, child):
 
 
     d = {
-    "id":str(lid),
-    "bg":str(bid),
+    "Id":str(lid),
+    "BrainId":str(bid),
 
-    "ia":str(me_tid),
-    "ib":str(child_tid),
+    "ThoughtIdA":str(me_tid),
+    "ThoughtIdB":str(child_tid),
 
-    "cdt":nows,
-    "mdt":nows,
-    "ty":0,"rl":1,"dr":-1,"mg":0,"co":-1,"th":-1}
+    "CreationDateTime":nows,
+    "ModificationDateTime":nows,
+    "Kind":0,
+    "Relation":1,
+    "Direction":-1,
+    "Meaning":1,
+    "Thickness":-1 }
 
-    lfile.write(`d`.replace("'", '"') + '\n')
+    lfile.write(  json.dumps(d) + '\n' )
 
 def makeUrlAttachment(tid, name, url):
-    d = {"bg":str(bid),
-    "id":str(uuid4()),  #str(makeid(bid, url)),
-    "sg":str(tid),
-    "nm":name,
-    "cdt":nows,
-    "mdt":nows,
-    "ty":3,"dl":0,
-    "lc":url,
-    "ii":False,
-    "st":0}
+    d = {
+    "BrainId":str(bid),
+    "Id":str(uuid4()),  #str(makeid(bid, url)),
+    "SourceId":str(tid),
+    "Name":name,
+    "Location":url,
+    
+    "CreationDateTime":nows,
+    "ModificationDateTime":nows,
+    "Type":3,
+    "DataLength":0,
+    "IsIcon":False,
+    "SourceType":2 }
     
     #print json.dumps(d)
     afile.write(  json.dumps(d) + '\n' )

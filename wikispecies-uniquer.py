@@ -8,21 +8,6 @@ f = open(fn2,'wt')
 seen = set()
 daggers = set()
 
-for line in open(fn,'rt').readlines():
-    line = line.replace('\n','')
-    d = eval(line)
-    id = d['id']
-    if line.find(r'\u2020') > -1:
-        daggers.add(id)
-
-replacer = '"nm": "'
-def maybedagger(id, line, daggers):
-    if not id in daggers:
-        return line
-    if line.find(r'\u2020') > -1:
-        return line
-    return line.replace(replacer, replacer+r'\u2020')
-
 count = 0
 def progress():
     global count
@@ -34,8 +19,24 @@ def progress():
 for line in open(fn,'rt').readlines():
     line = line.replace('\n','')
     d = eval(line)
-    id = d['id']
-    lb = d['lb']
+    id = d['Id']
+    if line.find(r'\u2020') > -1:
+        daggers.add(id)
+        progress()
+
+replacer = '"Name": "'
+def maybedagger(id, line, daggers):
+    if not id in daggers:
+        return line
+    if line.find(r'\u2020') > -1:
+        return line
+    return line.replace(replacer, replacer+r'\u2020')
+
+for line in open(fn,'rt').readlines():
+    line = line.replace('\n','')
+    d = eval(line)
+    id = d['Id']
+    lb = d['Label']
     if not id in seen and lb != '':
         f.write(maybedagger(id, line, daggers) + '\n')
         seen.add(id)
@@ -44,7 +45,7 @@ for line in open(fn,'rt').readlines():
 for line in open(fn,'rt').readlines():
     line = line.replace('\n','')
     d = eval(line)
-    id = d['id']
+    id = d['Id']
     if id in seen:
         continue
     f.write(maybedagger(id, line, daggers) + '\n')
