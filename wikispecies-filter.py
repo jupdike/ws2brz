@@ -6,6 +6,9 @@ import json
 import md5
 from datetime import *
 from uuid import *
+import HTMLParser
+
+htmlp = HTMLParser.HTMLParser()
 
 DEBUG_LOG = False
 
@@ -13,10 +16,10 @@ dagger = u'\u2020'
 dascii = dagger.encode('utf-8')
 
 #re.compile(r"(\{\{.*\}\})|(\[\[.*\]\])+")
-re1 = re.compile(dascii + r"\{\{[^ ]*\}\}")
-re2 = re.compile(dascii + r"\[\[[^ ]*\]\]")
-re3 = re.compile(r"\{\{[^ ]*\}\}")
-re4 = re.compile(r"\[\[[^ ]*\]\]")
+re1 = re.compile(dascii + r"\{\{.*?\}\}")
+re2 = re.compile(dascii + r"\[\[.*?\]\]")
+re3 = re.compile(r"\{\{.*?\}\}")
+re4 = re.compile(r"\[\[.*?\]\]")
 
 # {{image|Chaetognatha.PNG|Diversity of Chaetognatha}}
 #
@@ -27,8 +30,20 @@ imre4 = re.compile(r'\{\{image\|.+\.png', re.IGNORECASE)
 
 baddies = 'sp| g| ssp| glast| splast| ssplast|'.split()
 
+def unEscapeHTML(x):
+    x = x.decode('utf-8')
+    x = htmlp.unescape(x)
+    x = x.encode('utf-8')
+    return x
+
+abcs = 'abcdefghijklmnopqrstuvwxyz'
+abcs = abcs + abcs.upper()
 def cleanup(x):
-    x = x.replace(dascii+'[[','+').replace(dascii+'{{','+'). replace('[','').replace(']','').replace('{','').replace('}','')
+    x = x.replace(dascii+'[[','+').replace(dascii+'{{','+')
+    x = x.replace('[','').replace(']','').replace('{','').replace('}','')
+
+    x = unEscapeHTML(x)
+    
     extinct = x.find('+') > -1
     x = x.replace('+','')
 
@@ -37,11 +52,21 @@ def cleanup(x):
             x = x.replace(y,'')
     xs = x.split('|')
     x = ' '+ ' '.join(xs)
-    for z in 'abcdefghijklmnopqrstuvwxyz':
+    for z in abcs:
         x = x.replace(' '+z+' ', z)
     x = x.strip()
     if len(x) > 1:
         x = x[0].upper() + x[1:]
+        
+    # search for A (B) A
+    # or A B (C) A and change to
+    # A (B) or
+    # A B (C)
+    if x.find(') ') > -1:
+        ps = x.split(') ')
+        if ps[0].find(ps[1]) > -1:
+            x = ps[0] + ')'
+     
     dag = ''
     if extinct:
         dag = dascii
@@ -61,6 +86,7 @@ nows = now.strftime("%Y-%m-%dT%H:%M:%S.%f")
 
 def makeid(a, b):
     b = b.replace(dascii, '')
+    b = b.lower()
     return uuid5(a, b)
 
 metaD = { "BrainId":str(bid) }
@@ -179,44 +205,52 @@ def makeUrlAttachment(tid, name, url):
     afile.write(  json.dumps(d) + '\n' )
 
 page = ''
+taxo = ''
 vn = ''
 title = ''
 #blanklines = 0
 for line in fileinput.input():
-    origline = line
+    origline = line.strip()
     line = line.lower().strip()
     #line = line.decode("utf-8")
     
     # do we want this?
-    #if line == '':
-    #    if page != '':
-    #        page = ''
+    if line == '':
+        if page != '' and taxo == '': # found a blank line after {{PAGENAME}}\n{{other stuff}}\n
+            page = ''
+            if DEBUG_LOG: print 'page set to "" on account of empty line'
     if line.find('<title>') > -1:
-        ps = line.replace('</title>','').split('<title>')
+        ps = origline.replace('</title>','').split('<title>')
         page = ps[1]
         if page.find(':') > -1:
             page = ''
             continue
         page = cleanup(page)
+        
+        '''
+        # turn on testing code for small # of thoughts
+        if 'animalia' in page.lower():
+            DEBUG_LOG = True
+        else:
+            DEBUG_LOG = False
+        '''
+            
         taxo = page
         title = page
         vn = ''
         if DEBUG_LOG: print page + ' <THOUGHT>'
         makeThought(page, "")
-        #print 'page is', page
-        '''elif line.find('taxonavigation') > -1:
-        #print 'taxonavigation for', page
-        taxo = page
         
-        #print '---------'
-        #print 'PAGE', page'''
+        if DEBUG_LOG: print 'page set to "'+page+'"'
+        
     elif line.find('__toc__') > -1:
-        #if taxo != '':
         page = ''
         taxo = ''
+        if DEBUG_LOG: print 'page and taxo set to "" on account of __toc__'
     elif line.find('taxonavigation') < 0 and line.startswith('=='):
         page = ''
         taxo = ''
+        if DEBUG_LOG: print 'page and taxo set to "" on account of == NOT taxonavigation'
     elif line.startswith('{{vn'):
         vn = 'vn'
     elif vn != '' and line.find('|en=') > -1:
@@ -229,12 +263,16 @@ for line in fileinput.input():
             if line.find('}}') > -1:
                 line = line[:line.index('}}')]
             label = line.strip()
+            
+            label = unEscapeHTML(label)
+            
             if label != '':
                 if DEBUG_LOG: print title + " --LABEL--> " + label
                 makeThought(title, label)
     else:
         ims = imre1.findall(origline) + imre2.findall(origline) + imre3.findall(origline) + imre4.findall(origline)
         if len(ims) > 0 and page != '':
+            if DEBUG_LOG: print 'found some images: '+`ims`
             for imurl in ims:
                 imurl = imurl.replace(' ', '_').replace('[[','').replace('file:','').replace('File:','').replace('image:','').replace('Image:','').replace('{{image|','').replace('{{Image|','')
                 imname = imurl
@@ -245,22 +283,21 @@ for line in fileinput.input():
                 tid = makeid(bid, page)
                 makeUrlAttachment(tid, imname, imurl)
                 if DEBUG_LOG: print page + " --IMAGE--> " + imurl
-        elif page != '': #taxo == page and taxo != '' and page != '':
-            ret = re1.findall(line) + re2.findall(line) + re3.findall(line) + re4.findall(line)
+        elif page != '':
+            ret = re1.findall(origline) + re2.findall(origline) + re3.findall(origline) + re4.findall(origline)
+            if DEBUG_LOG and len(ret) > 0:
+                print ret
             for x in ret:
                 x = cleanup(x)
                 if x == '':
                     continue
-                
                 if x.find(':') > -1:
                     continue
-                
                 # eat every line until we find {{PAGENAME}}, then the stuff below are the children!
                 if taxo != '':
                     if x == taxo:
                         taxo = ''
                     continue
-                
                 # ok we ate the {{PAGENAME}} line, make everything after that into a child link!
                 if DEBUG_LOG: print page + " --LINK CHILD--> " + x
                 makeLink(page, x)
