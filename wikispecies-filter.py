@@ -94,6 +94,7 @@ open('ws/meta.json', 'wt').write( json.dumps(metaD) )
 
 afile = open('ws/attachments.json', 'wt')
 open('ws/tombstones.json', 'wt').write('')
+open('ws/access.json', 'wt').write('')
 
 # in Enums.cs, BrainSettingKey.BrainName = 19, make enum->int->string, similar for HomeThoughtId
 BrainName = "19"
